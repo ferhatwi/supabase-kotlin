@@ -1,61 +1,31 @@
 plugins {
-    kotlin("multiplatform")
-    id("com.android.library")
+    id(libs.plugins.kotlin.multiplatform.get().pluginId)
+    id(libs.plugins.android.kotlin.multiplatform.library.get().pluginId)
 }
 
-group = "io.github.jan-tennert.supabase"
-version = Versions.PROJECT
 description = "Extends supabase-kt with a Postgrest Client"
 
 repositories {
     mavenCentral()
 }
 
+@OptIn(org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi::class)
 kotlin {
-    jvm {
-        jvmToolchain(8)
-        compilations.all {
-            kotlinOptions.freeCompilerArgs = listOf(
-                "-Xjvm-default=all",  // use default methods in interfaces,
-                "-Xlambdas=indy"      // use invokedynamic lambdas instead of synthetic classes
-            )
-        }
-    }
-    android {
-        publishLibraryVariants("release", "debug")
-    }
-    js(IR) {
-        browser {
-            testTask {
-                enabled = false
-            }
-        }
-    }
-    //ios()
+    defaultConfig()
+    allTargets()
     sourceSets {
-        all {
-            languageSettings.optIn("kotlin.RequiresOptIn")
-        }
-        val commonMain by getting {
+        commonMain {
             dependencies {
-                api(project(":gotrue-kt"))
+                addModules(SupabaseModule.AUTH)
                 api(libs.kotlin.reflect)
             }
         }
-        val jvmMain by getting
-        val androidMain by getting
-        val jsMain by getting
+        commonTest {
+            dependencies {
+                implementation(libs.bundles.testing)
+                implementation(project(":test-common"))
+            }
+        }
     }
 }
 
-android {
-    compileSdk = 33
-    sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
-    defaultConfig {
-        minSdk = 21
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
-    }
-}

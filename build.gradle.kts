@@ -1,170 +1,83 @@
-import java.net.URL
+@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
-buildscript {
-    dependencies {
-        classpath(libs.kotlinx.atomicfu.plugin)
-    }
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.targets.js.yarn.YarnLockMismatchReport
+import org.jetbrains.kotlin.gradle.targets.js.yarn.YarnRootExtension
+
+val excludedModules = listOf("plugins", "serializers", "test-common")
+
+private val libraryFilter = { withFilter: Boolean ->
+    allprojects.filter { it.name !in excludedModules && !it.path.contains("sample") && if(withFilter) true else it.name != "bom" && it.name != it.rootProject.name }
 }
+
+fun libraryModules(withBom: Boolean = true, init: Project.() -> Unit) = configure(
+    libraryFilter(withBom),
+    init
+)
 
 plugins {
-    alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.android.library)
-    alias(libs.plugins.dokka)
-    alias(libs.plugins.kotlinx.plugin.serialization)
-    alias(libs.plugins.maven.publish)
+    id(libs.plugins.kotlin.multiplatform.get().pluginId) apply false
+    id(libs.plugins.android.kotlin.multiplatform.library.get().pluginId) apply false
+    id(libs.plugins.detekt.get().pluginId) apply false
+    id(libs.plugins.dokka.get().pluginId)
+    alias(libs.plugins.kotlinx.plugin.serialization) apply false
+    id(libs.plugins.maven.publish.get().pluginId) apply false
+    id(libs.plugins.power.assert.get().pluginId) apply false
 }
-
-val modules = listOf("supabase-kt", "gotrue-kt", "postgrest-kt", "storage-kt", "realtime-kt", "functions-kt", "apollo-graphql")
 
 allprojects {
     repositories {
         google()
-        maven("https://maven.pkg.jetbrains.space/public/p/compose/dev/")
         mavenCentral()
-        maven {
-            url = uri("https://maven.pkg.jetbrains.space/public/p/ktor/eap")
-            name = "ktor-eap"
-        }
     }
 }
 
-configure(allprojects.filter { it.name in modules || it.name == "bom" }) {
+dependencies {
+    libraryFilter(false).forEach {
+        dokka(project(it.path))
+    }
+}
+
+libraryModules {
     apply(plugin = "org.jetbrains.dokka")
     apply(plugin = "org.jetbrains.kotlin.plugin.serialization")
-    apply(plugin = "kotlinx-atomicfu")
     apply(plugin = "com.vanniktech.maven.publish")
 
-    mavenPublishing {
-        publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.S01)
+    group = extra["base-group"].toString()
+    version = supabaseVersion
 
-        signAllPublications()
+    applyPublishing()
+}
 
-        coordinates("io.github.jan-tennert.supabase", this@configure.name, Versions.PROJECT)
+val reportMerge by tasks.registering(io.gitlab.arturbosch.detekt.report.ReportMergeTask::class) {
+    output.set(rootProject.layout.buildDirectory.file("reports/detekt/merge.sarif"))
+}
 
-        pom {
-            name.set(this@configure.name)
-            description.set(this@configure.description ?: "A Kotlin Multiplatform Supabase SDK")
-            inceptionYear.set("2023")
-            url.set("https://github.com/supabase-community/supabase-kt/")
-            licenses {
-                license {
-                    name.set("MIT License")
-                    url.set("https://mit-license.org/")
-                    distribution.set("https://mit-license.org/")
-                }
-            }
-            developers {
-                developer {
-                    id.set("TheRealJan")
-                    name.set("Jan Tennert")
-                    url.set("https://github.com/jan-tennert/")
-                }
-            }
-            scm {
-                url.set("https://github.com/supabase-community/supabase-kt/")
-                connection.set("scm:git:git://github.com/supabase-community/supabase-kt.git")
-                developerConnection.set("scm:git:ssh://git@github.com/supabase-community/supabase-kt.git")
-            }
+libraryModules(false) {
+    applyDokkaWithConfiguration()
+    applyPowerAssertConfiguration()
+    applyDetektWithConfiguration(reportMerge)
+}
+
+tasks.register("detektAll") {
+    libraryModules(false) {
+        this@register.dependsOn(tasks.withType<io.gitlab.arturbosch.detekt.Detekt>())
+    }
+}
+
+// Configure Gradle Task to build all sample submodules at once
+configure(allprojects.filter { it.parent?.name == "sample" }) {
+    val children = this.childProjects
+    this.tasks.register("buildAll") {
+        children.values.forEach { child ->
+            this.dependsOn(child.tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>())
         }
     }
 }
 
-configure(allprojects.filter { it.name in modules }) {
-    tasks.withType<org.jetbrains.dokka.gradle.DokkaTaskPartial>().configureEach {
-        dokkaSourceSets.configureEach {
-            sourceLink {
-                val name = when(moduleName.get()) {
-                    "functions-kt" -> "Functions"
-                    "gotrue-kt" -> "GoTrue"
-                    "postgrest-kt" -> "Postgrest"
-                    "realtime-kt" -> "Realtime"
-                    "storage-kt" -> "Storage"
-                    else -> ""
-                }
-                localDirectory.set(projectDir.resolve("src"))
-                remoteUrl.set(URL("https://github.com/supabase-community/supabase-kt/tree/master/$name/src"))
-                remoteLineSuffix.set("#L")
-            }
-        }
-    }
-}
-
-group = "io.github.jan-tennert.supabase"
-version = Versions.PROJECT
-
-kotlin {
-    jvm {
-        jvmToolchain(8)
-        compilations.all {
-            kotlinOptions.freeCompilerArgs = listOf(
-                "-Xjvm-default=all",  // use default methods in interfaces,
-                "-Xlambdas=indy"      // use invokedynamic lambdas instead of synthetic classes
-            )
-        }
-    }
-    android {
-        publishLibraryVariants("release", "debug")
-    }
-    js(IR) {
-        browser {
-            testTask {
-                enabled = false
-            }
-        }
-    }
-    //ios()
-    sourceSets {
-        all {
-            languageSettings.optIn("kotlin.RequiresOptIn")
-        }
-        val commonMain by getting {
-            dependencies {
-                api(libs.kotlinx.datetime)
-                api(libs.kotlinx.coroutines.core)
-                api(libs.napier)
-                api(libs.bundles.ktor.client)
-                api(libs.kotlinx.atomicfu)
-            }
-        }
-        val commonTest by getting {
-            dependencies {
-                implementation(kotlin("test"))
-                implementation(libs.ktor.client.mock)
-                implementation(libs.kotlinx.coroutines.test)
-            }
-        }
-        val jvmMain by getting {
-        }
-        val jvmTest by getting
-        val androidMain by getting {
-            dependencies {
-                api(libs.android.lifecycle.process)
-            }
-        }
-        val androidUnitTest by getting {
-            dependencies {
-                implementation("junit:junit:4.13.2")
-            }
-        }
-        val jsMain by getting {
-            dependencies {
-              //  api(compose.web.core)
-            }
-        }
-    }
-}
-
-android {
-    compileSdk = 33
-    sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
-    defaultConfig {
-        minSdk = 21
-    }
-    lint {
-        abortOnError = false
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
-    }
+rootProject.plugins.withType(org.jetbrains.kotlin.gradle.targets.js.yarn.YarnPlugin::class.java) {
+    rootProject.the<YarnRootExtension>().yarnLockMismatchReport =
+        YarnLockMismatchReport.WARNING
+    rootProject.the<YarnRootExtension>().reportNewYarnLock = false
+    rootProject.the<YarnRootExtension>().yarnLockAutoReplace = true
 }

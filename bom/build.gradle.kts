@@ -2,13 +2,11 @@ plugins {
     `java-platform`
 }
 
-group = "io.github.jan-tennert.supabase"
-version = Versions.PROJECT
 description = "A Kotlin Multiplatform Supabase Framework"
 
 val bomProject = project
 
-val excludedModules = listOf<String>()
+val excludedModules = listOf("test-common")
 
 fun shouldIncludeInBom(candidateProject: Project) =
     excludedModules.all { !candidateProject.name.contains(it) } &&

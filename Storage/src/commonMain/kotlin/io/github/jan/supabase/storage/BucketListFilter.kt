@@ -1,25 +1,43 @@
 package io.github.jan.supabase.storage
 
+import io.github.jan.supabase.annotations.SupabaseInternal
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 
+/**
+ * A filter builder for [BucketApi.list]
+ */
 class BucketListFilter {
 
+    /**
+     * The limit of items to return
+     */
     var limit: Int? = null
+
+    /**
+     * The starting position
+     */
     var offset: Int? = null
+
+    /**
+     * The search string to filter files by.
+     */
     var search: String? = null
     private var column: String? = null
     private var order: String? = null
 
     /**
      * Sorts the result by the given [column] in the given [order]
+     * @param column The column to sort by
+     * @param order The sort order (ascending or descending)
      */
-    fun sortBy(column: String, order: String) {
+    fun sortBy(column: String, order: SortOrder) {
         this.column = column
-        this.order = order
+        this.order = order.name.lowercase()
     }
 
+    @SupabaseInternal
     fun build() = buildJsonObject {
         limit?.let {
             put("limit", it)
@@ -32,8 +50,8 @@ class BucketListFilter {
         }
         column?.let {
             putJsonObject("sortBy") {
-                put("column", it)
-                put("order", it)
+                put("column", column)
+                put("order", order)
             }
         }
     }

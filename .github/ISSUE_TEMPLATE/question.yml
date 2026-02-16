@@ -2,8 +2,16 @@ name: Question
 description: Template for questions
 title: '[Question]: '
 labels: ["question"]
-assignees: jan-tennert
 body:
+  - type: checkboxes
+    id: general
+    attributes:
+      label: General info
+      options:
+        - label: I checked the issues and discussions for similar questions
+          required: true
+        - label: I checked the [troubleshooting](https://github.com/supabase-community/supabase-kt/blob/master/TROUBLESHOOTING.md) page for similar problems
+          required: true
   - type: textarea
     id: question
     attributes:
@@ -11,3 +19,9 @@ body:
       description: Please ask your question
     validations:
       required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output (optional)
+      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
+      render: shell

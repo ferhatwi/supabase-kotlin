@@ -2,8 +2,6 @@ name: Bug Report
 description: File a bug report
 title: "[Bug]: "
 labels: ["bug"]
-assignees:
-  - jan-tennert
 body:
   - type: markdown
     attributes:
@@ -14,22 +12,34 @@ body:
     attributes:
       label: General Info
       options:
-        - label: I checked for similar bug report
+        - label: I checked the issues for similar bug reports
+          required: true
+        - label: I installed the latest version of supabase-kt
+          required: true
+        - label: I checked the [troubleshooting](https://github.com/supabase-community/supabase-kt/blob/master/TROUBLESHOOTING.md) page for similar problems
           required: true
   - type: input
     id: version
     attributes:
       label: Version(s)
-      description: which supabase-kt versions are affected
-      placeholder: 0.8.4
+      description: Which supabase-kt versions are affected
+      placeholder: 3.0.0
     validations:
       required: true
   - type: input
     id: target
     attributes:
-      label: Target(s)
-      description: which kotlin targets are affected
-      placeholder: JVM and Android
+      label: Kotlin Version
+      description: Which Kotlin versions are affected
+      placeholder: Kotlin 2.2.21
+    validations:
+      required: true
+  - type: input
+    id: target
+    attributes:
+      label: Kotlin Target(s) and their respective versions
+      description: Which Kotlin targets are affected
+      placeholder: JVM 17, iOS 16 and Android 14
     validations:
       required: true
   - type: textarea

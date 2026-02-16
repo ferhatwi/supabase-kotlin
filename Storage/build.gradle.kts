@@ -1,65 +1,42 @@
 plugins {
-    kotlin("multiplatform")
-    id("com.android.library")
+    id(libs.plugins.kotlin.multiplatform.get().pluginId)
+    id(libs.plugins.android.kotlin.multiplatform.library.get().pluginId)
 }
 
-group = "io.github.jan-tennert.supabase"
-version = Versions.PROJECT
 description = "Extends supabase-kt with a Storage Client"
 
 repositories {
     mavenCentral()
 }
 
+@OptIn(org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi::class)
 kotlin {
-    jvm {
-        jvmToolchain(8)
-        compilations.all {
-            kotlinOptions.freeCompilerArgs = listOf(
-                "-Xjvm-default=all",  // use default methods in interfaces,
-                "-Xlambdas=indy"      // use invokedynamic lambdas instead of synthetic classes
-            )
+    defaultConfig()
+    applyDefaultHierarchyTemplate {
+        common {
+            androidAndJvmGroup()
+            settingsGroup()
         }
     }
-    android {
-        publishLibraryVariants("release", "debug")
-    }
-    js(IR) {
-        browser {
-            testTask {
-                enabled = false
-            }
-        }
-    }
-    //ios()
+    allTargets()
     sourceSets {
-        all {
-            languageSettings.optIn("kotlin.RequiresOptIn")
-        }
-        val commonMain by getting {
+        commonMain {
             dependencies {
-                api(project(":gotrue-kt"))
+                addModules(SupabaseModule.AUTH)
             }
         }
-        val nonJsMain by creating {}
-        val jvmMain by getting {
-            dependsOn(nonJsMain)
+        commonTest {
+            dependencies {
+                implementation(project(":test-common"))
+                implementation(libs.bundles.testing)
+                implementation(libs.turbine)
+            }
         }
-        val androidMain by getting {
-            dependsOn(nonJsMain)
+        val settingsMain by getting {
+            dependencies {
+                api(libs.bundles.multiplatform.settings)
+            }
         }
-        val jsMain by getting
     }
 }
 
-android {
-    compileSdk = 33
-    sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
-    defaultConfig {
-        minSdk = 21
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
-    }
-}

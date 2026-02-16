@@ -1,10 +1,8 @@
 plugins {
-    kotlin("multiplatform")
-    id("com.android.library")
+    id(libs.plugins.kotlin.multiplatform.get().pluginId)
+    id(libs.plugins.android.kotlin.multiplatform.library.get().pluginId)
 }
 
-group = "io.github.jan-tennert.supabase"
-version = Versions.PROJECT
 description = "Extends supabase-kt with a Edge Functions Client"
 
 repositories {
@@ -12,51 +10,19 @@ repositories {
 }
 
 kotlin {
-    jvm {
-        jvmToolchain(8)
-        compilations.all {
-            kotlinOptions.freeCompilerArgs = listOf(
-                "-Xjvm-default=all",  // use default methods in interfaces,
-                "-Xlambdas=indy"      // use invokedynamic lambdas instead of synthetic classes
-            )
-        }
-    }
-    android {
-        publishLibraryVariants("release", "debug")
-    }
-    js(IR) {
-        browser {
-            testTask {
-                enabled = false
-            }
-        }
-    }
-    //ios()
+    defaultConfig()
+    allTargets()
     sourceSets {
-        all {
-            languageSettings.optIn("kotlin.RequiresOptIn")
-        }
-        val commonMain by getting {
+        commonMain {
             dependencies {
-                api(project(":"))
-                api(project(":gotrue-kt"))
+                addModules(SupabaseModule.AUTH, SupabaseModule.SUPABASE)
             }
         }
-        val commonTest by getting
-        val jvmMain by getting
-        val androidMain by getting
-        val jsMain by getting
-    }
-}
-
-android {
-    compileSdk = 33
-    sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
-    defaultConfig {
-        minSdk = 21
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        commonTest {
+            dependencies {
+                implementation(project(":test-common"))
+                implementation(libs.bundles.testing)
+            }
+        }
     }
 }

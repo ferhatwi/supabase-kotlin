@@ -1,12 +1,23 @@
 package io.github.jan.supabase.realtime
 
-import io.github.jan.supabase.realtime.annotiations.ChannelDsl
+import io.github.jan.supabase.annotations.SupabaseInternal
+import io.github.jan.supabase.realtime.annotations.ChannelDsl
 
+/**
+ * Used to build a realtime channel
+ */
 @ChannelDsl
-class RealtimeChannelBuilder @PublishedApi internal constructor(private val topic: String, private val realtimeImpl: RealtimeImpl) {
+class RealtimeChannelBuilder @PublishedApi internal constructor(
+    private val topic: String,
+) {
 
-    private var broadcastJoinConfig = BroadcastJoinConfig(false, false)
-    private var presenceJoinConfig = PresenceJoinConfig("")
+    private var broadcastJoinConfig = BroadcastJoinConfig(acknowledgeBroadcasts = false, receiveOwnBroadcasts = false)
+    private var presenceJoinConfig = PresenceJoinConfig("", false)
+
+    /**
+     * Whether this channel should be private.
+     */
+    var isPrivate = false
 
     /**
      * Sets the broadcast join config
@@ -17,17 +28,20 @@ class RealtimeChannelBuilder @PublishedApi internal constructor(private val topi
 
     /**
      * Sets the presence join config
+     * @param block The presence join config
      */
     fun presence(block: PresenceJoinConfig.() -> Unit) {
-        presenceJoinConfig = PresenceJoinConfig("").apply(block)
+        presenceJoinConfig = PresenceJoinConfig("", false).apply(block)
     }
 
-    fun build(): RealtimeChannel {
+    @SupabaseInternal
+    fun build(realtime: Realtime): RealtimeChannel {
         return RealtimeChannelImpl(
-            realtimeImpl,
+            realtime,
             topic,
             broadcastJoinConfig,
-            presenceJoinConfig
+            presenceJoinConfig,
+            isPrivate
         )
     }
 

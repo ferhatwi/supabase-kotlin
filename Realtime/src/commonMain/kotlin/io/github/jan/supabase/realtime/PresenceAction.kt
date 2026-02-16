@@ -1,5 +1,7 @@
 package io.github.jan.supabase.realtime
 
+import io.github.jan.supabase.SupabaseSerializer
+import io.github.jan.supabase.decode
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
@@ -7,13 +9,11 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -38,8 +38,8 @@ data class Presence(
         override fun deserialize(decoder: Decoder): Presence {
             decoder as JsonDecoder
             val json = decoder.decodeJsonElement().jsonObject
-            val meta = json["metas"]?.jsonArray?.get(0)?.jsonObject ?: throw IllegalStateException("A presence should at least have a phx_ref. Full json: $json")
-            val presenceRef = meta["phx_ref"]?.jsonPrimitive?.contentOrNull ?: throw IllegalStateException("A presence should at least have a phx_ref. Full json: $json")
+            val meta = json["metas"]?.jsonArray?.get(0)?.jsonObject ?: error("A presence should at least have metas. Full json: $json")
+            val presenceRef = meta["phx_ref"]?.jsonPrimitive?.contentOrNull ?: error("A presence should at least have a phx_ref. Full json: $json")
             return Presence(presenceRef, JsonObject(meta.toMutableMap().apply {
                 remove("phx_ref")
             }))
@@ -60,16 +60,16 @@ data class Presence(
      *
      * **Note: You also receive your own presence, but without your state so be aware of exceptions or use [stateAsOrNull] instead**
      */
-    inline fun <reified T> stateAs(json: Json): T {
-        return json.decodeFromJsonElement(state)
+    inline fun <reified T> stateAs(serializer: SupabaseSerializer): T {
+        return serializer.decode(state.toString())
     }
 
     /**
      * Decodes [state] as [T] or null if there is an exception while decoding
      */
-    inline fun <reified T> stateAsOrNull(json: Json): T? {
+    inline fun <reified T> stateAsOrNull(serializer: SupabaseSerializer): T? {
         return try {
-            stateAs(json)
+            stateAs(serializer)
         } catch (e: Exception) {
             null
         }
@@ -77,6 +77,9 @@ data class Presence(
 
 }
 
+/**
+ * Represents a presence action
+ */
 sealed interface PresenceAction {
 
     /**
@@ -93,33 +96,35 @@ sealed interface PresenceAction {
 
 }
 
+@PublishedApi
 internal class PresenceActionImpl(
+    @PublishedApi internal val serializer: SupabaseSerializer,
     override val joins: Map<String, Presence>,
     override val leaves: Map<String, Presence>
 ) : PresenceAction
 
 /**
  * Decodes all [PresenceAction.joins] values as [T]
- * @param json The [Json] instance to use for decoding
- * @param ignoreOtherTypes Whether to ignore presences which cannot be decoded as [T]
+ * @param ignoreOtherTypes Whether to ignore presences which cannot be decoded as [T] such as your own presence
  */
-inline fun <reified T> PresenceAction.decodeJoinsAs(json: Json = Json, ignoreOtherTypes: Boolean = true): List<T> = joins.values.mapNotNull {
+inline fun <reified T> PresenceAction.decodeJoinsAs(ignoreOtherTypes: Boolean = true): List<T> = joins.values.mapNotNull {
+    this as PresenceActionImpl
     if (ignoreOtherTypes) {
-        it.stateAsOrNull<T>(json)
+        it.stateAsOrNull<T>(serializer)
     } else {
-        it.stateAs<T>(json)
+        it.stateAs<T>(serializer)
     }
 }
 
 /**
  * Decodes all [PresenceAction.leaves] values as [T]
- * @param json The [Json] instance to use for decoding
- * @param ignoreOtherTypes Whether to ignore presences which cannot be decoded as [T]
+ * @param ignoreOtherTypes Whether to ignore presences which cannot be decoded as [T] such as your own presence
  */
-inline fun <reified T> PresenceAction.decodeLeavesAs(json: Json = Json, ignoreOtherTypes: Boolean = true): List<T> = leaves.values.mapNotNull {
+inline fun <reified T> PresenceAction.decodeLeavesAs(ignoreOtherTypes: Boolean = true): List<T> = leaves.values.mapNotNull {
+    this as PresenceActionImpl
     if (ignoreOtherTypes) {
-        it.stateAsOrNull<T>(json)
+        it.stateAsOrNull<T>(serializer)
     } else {
-        it.stateAs<T>(json)
+        it.stateAs<T>(serializer)
     }
 }
